@@ -17,7 +17,7 @@ Haupt-Funktionen:
     16 RGB Bild in S/W-Bild oder Graustufenbild umwandeln (Schwellwert finden für Unterscheidung von Wolken, Sternen, Mond und andere Lichtquellen)
     Korrelation mit Wetterdaten wie Regen (Tropen pro Minute) vom Regensensor RG-11
     Die Himmelsdaten sind bezüglich meines Standortes zu berechnen: Latitude: 51,4798° Nord, Longitude: 13,7319 Ost, Höhe ü.N.N. = 95 m
-    
+
 
 Berechnungsschema in Python: 
             K1 = 30. //Startwerte für Optimierung
@@ -37,4 +37,100 @@ Berechnungsschema in Python:
             
             Td = (K1 / 100.) * (Tamb - K2 / 10.) + (K3 / 100.) * pow(exp(K4 / 1000. * Tamb), (K5 / 100.)) + T67
             Tsky=Tobj-Td
-            Der WBG wird durch Kategorisierung in Abhängigkeit 
+            Der WBG wird durch Kategorisierung in Abhängigkeit der Tsky bestimmt,
+            Quelle für Berechnung: https://lunaticoastro.com/aagcw/TechInfo/SkyTemperatureModel.pdf
+
+
+Fehlende Informationen im Pflichtenheft: (Antworten durch -> gekennzeichnet)
+1. Datenbank-Spezifikation
+    Welches DBMS? (SQLite, PostgreSQL, MySQL, MongoDB)->  MariaDB, MySQL
+    -> wie findest du die Idee einer RoundRobin Database rrb?
+    Schema/Struktur der Tabellen? -> ? Vorschlag ?
+    Datenretention (wie lange Daten speichern)? -> 2 Jahre
+    Backup-Strategie? -> ohne
+2. API-Details
+    URL/Endpoint der PWS-API -> "siehe Antwort"
+    Authentifizierung erforderlich?
+    Rate Limits? 
+    Datenformat/Struktur der JSON-Response -> wird als JSON geliefert
+       Bsp. observations: 
+            [{'stationID': 'ILAUCH27', 
+            'obsTimeUtc': '2023-07-05T10:00:40Z',
+            'obsTimeLocal': '2023-07-05 12:00:40', 
+            'neighborhood': 'Lauchhammer',
+            'softwareType': 'EasyWeatherV1.5.7', 
+            'country': 'DE', 
+            'solarRadiation': 337.0, 
+            'lon': 13.73, 
+            'realtimeFrequency': None, 
+            'epoch': 1688551240, 
+            'lat': 51.479, 
+            'uv': 3.0, 
+            'winddir': 225, 
+            'humidity': 53, 
+            'qcStatus': 1, 
+            'metric': 
+                {'temp': 25, 
+                'heatIndex': 25, 
+                'dewpt': 15, 
+                'windChill': 25, 
+                'windSpeed': 9, 
+                'windGust': 15, 
+                'pressure': 1006.54, 
+                'precipRate': 0.0, 
+                'precipTotal': 0.0, 
+                'elev': 29}}]
+    Fehlerbehandlung bei API-Ausfall?
+    -> Antwort:
+        # API key von www.weather.com 
+        api_key = '46cf957af9f541488f957af9f561488e'
+        # base url variable to store url
+        base_url = 'https://api.weather.com/v2/pws/observations/current?'
+        # give city name 
+        stationID = 'ILAUCH27'
+        # complete_url variable to store
+        complete_url = base_url + "stationId=" + stationID + "&format=json&units=m&apiKey=" + api_key
+
+3. AllSkyCam Integration
+    SCP-Zugangsdaten/Konfiguration -> out of this scope, aktuelles Bild in ~/Arbeitsplatz/Weatherdata/image/image.jpg das mit Timestamp versehen und in DB ablegen
+    Bildformat (Auflösung, Farbtiefe)? -> JPEG, 16-bit RGB Image
+    Speicherort der Images? -> ~/Arbeitsplatz/Weatherdata/image/image.jpg
+    Verhalten bei fehlenden Bildern? -> übergehen
+4. Wolkentemperatursensor
+    API-Endpoint für JSON-Abfrage -> ~/Arbeitsplatz/Weatherdata/Temp/Td.json
+    Datenstruktur der Sensorwerte -> JSON-Bsp: 'MLX90614': {'init': True, 'T amb': 46.86998749, 'T obj': 32.24999237}, 
+    Abfrageintervall? -> 1/minute
+5. RG-11 Regensensor
+    Datenabruf-Methode (API, direkte Verbindung)? -> JSON-File in ~/Arbeitsplatz/Weatherdata/RG-11/rain.json, {'RG11 Rain Sensor': {'init': True, 'mode': 'drop detect', 'count': 17385, 'drop freq': 0}
+    Datenformat? -> json
+6. Web-Interface Anforderungen
+    Benutzerauthentifizierung? -> Nein
+    Welche Visualisierungen (Diagramme, Karten, Tabellen)? -> vorgesehen für Version 2
+    Mobile Unterstützung? -> keine
+    Echtzeit-Updates oder statisch? -> statisch
+    Hosting (lokal, Cloud)? -> lokal
+7. Optimierung der Koeffizienten K1-K7
+    Welche Methode? (Least Squares, ML-basiert?) -> Least Square
+    Trainingsdaten verfügbar? -> diese werden mit den anderen Programmteile erzeugt
+    Validierungskriterien? -> 
+8. ROI-Definition
+    "Startwert = 30°" - 30° Radius vom Zenit? -> ja
+    Pixelkoordinaten des Zenits im Bild? zentraler Punkt des Images, 
+    Soll ROI dynamisch anpassbar sein? -> nein
+9. Wolken vs. Sterne Unterscheidung
+    Gibt es Referenzdaten für Training? -> Nein, aber der Fehler bei der Wolkenbedeckung durch Sterne ist zu vernachlässigen. Zweite Möglichkeit ist, den Hintergrund (kleiner Sternenfreier Ausschnitt) 
+    eine wolkenfreies Image von Den Gesamtbild abzuziehen, dann bleiben die Sterne übrig, deren gesamt Helligkeit werden zu Threshold dazuaddiert.
+    Gewünschte Genauigkeit? -> +/- 5 bis 10 % der WBG ist akzeptabel
+    Umgang mit Mond/Planeten? -> sind im 30° Radius um den Zenit nicht zu erwarten
+10. Mondphase & Winkelabstand
+    Welche Präzision erforderlich? -> 5% ist ausreichend
+    Einfluss auf welche Berechnungen? ->Hat Einfluss auf die Gesamthelligkeit des Himmelhintergrundes (Threshold)
+11. Deployment & Betrieb
+    Ziel-System (Linux, Windows, RPi)? ->Linux Mint 22.3
+    Automatischer Start als Service? -> erst nach erfolgreichem Test 
+    Logging-Anforderungen? -> bei Fehler, einfaches Text logging
+    Monitoring/Alerting bei Fehlern? -> nein
+12. Berechnungsformel
+    WBG-Kategorisierung fehlt (Text bricht ab) -> müssen wir nach den Optimierungen der Koeffizienten K1 .. K7 erarbeiten
+    Einheiten für Tsky, Td, WBG? -> Tsky und Td, Tamb sind in °C, WBG in %
+    Formel vollständig/getestet? -> ja
