@@ -1,0 +1,270 @@
+Weather-DB v1 - Entwicklungsstand 18. Januar 2026
+===========================================================
+
+## Projektübersicht
+Python-basierte Wetterdatenbank mit AllSky-Kamera-Integration, Wolkenbedeckungsanalyse und 
+automatischer Datenerfassung von PWS-Wetterstation und verschiedenen Sensoren.
+
+## Technologie-Stack (ENTSCHIEDEN)
+- Sprache: Python 3.9+
+- Datenbank: RRDtool für Zeitreihen + SQLite für Metadaten/Bildpfade
+- Bildverarbeitung: OpenCV, Pillow
+- Astronomie: ephem/astropy
+- Web: Flask (für Version 2)
+- System: Linux Mint 22.3
+
+## Datenquellen & Pfade
+
+### 1. PWS Weather API
+- Endpoint: https://api.weather.com/v2/pws/observations/current
+- Station: ILAUCH27
+- API Key: 46cf957af9f541488f957af9f561488e
+- Format: JSON
+- Abfrageintervall: 1x/Stunde
+- Liefert: Tamb (Außentemperatur), Druck, Feuchtigkeit, Wind, UV, Solar, Regen
+
+JSON-Struktur:
+```json
+{
+  "observations": [{
+    "stationID": "ILAUCH27",
+    "obsTimeUtc": "2023-07-05T10:00:40Z",
+    "obsTimeLocal": "2023-07-05 12:00:40",
+    "metric": {
+      "temp": 25,
+      "pressure": 1006.54,
+      "humidity": 53,
+      "windSpeed": 9,
+      ...
+    }
+  }]
+}
+```
+
+### 2. MLX90614 Wolkentemperatursensor
+- Pfad: ~/Arbeitsplatz/Weatherdata/Temp/Td.json
+- Abfrageintervall: 1x/Minute
+- Liefert: Tobj (IR-Himmelstemperatur), Tamb
+
+JSON-Struktur:
+```json
+{
+  "MLX90614": {
+    "init": true,
+    "T amb": 46.86998749,
+    "T obj": 32.24999237
+  }
+}
+```
+
+### 3. RG-11 Regensensor
+- Pfad: ~/Arbeitsplatz/Weatherdata/RG-11/rain.json
+- Abfrageintervall: ?
+- Liefert: Tropfenzähler, Modus
+
+JSON-Struktur:
+```json
+{
+  "RG11 Rain Sensor": {
+    "init": true,
+    "mode": "drop detect",
+    "count": 17385,
+    "drop freq": 0
+  }
+}
+```
+
+### 4. AllSky Kamera Bilder
+- Aktuelles Bild: ~/Arbeitsplatz/Weatherdata/image/image.jpg
+- Referenzbild (wolkenlos): ~/Arbeitsplatz/Weatherdata/image/Wolkenloses-image.jpg
+- Lieferung: alle 5 Minuten (via SCP, außerhalb Scope)
+- Format: JPEG, 16-bit RGB
+- Dimensionen: 4056 x 3040 Pixel
+- Bei fehlendem Bild: übergehen
+
+## Bildverarbeitung (SPEZIFIZIERT)
+
+### ROI-Definition
+- Radius: 30° um Zenit
+- Zenit: Bildmitte = (2028, 1520)
+- Fisheye-Annahme: 180° = Bildhöhe
+- ROI-Radius in Pixel: ~507 Pixel
+
+### Verarbeitungsschritte
+1. Lade image.jpg + Wolkenloses-image.jpg
+2. RGB → Grayscale (Luminanz: 0.299*R + 0.587*G + 0.114*B)
+3. ROI-Maske anwenden (Kreis, Radius 507px)
+4. Optional: Sternenkorrektur (aktuell - Referenz)
+5. Threshold anwenden: 0,05 normalisiert = 3277 absolut (bei 16-bit: 0-65535)
+6. WBG-Berechnung: (Pixel > 3277 im ROI / Gesamt-Pixel ROI) × 100%
+
+### Bildstatistik (Beispiel Image01)
+- count: 12.330.240 Pixel (100%)
+- mean: 2978.6
+- median: 2312.9
+- minimum: 0.0
+- maximum: 65535.0
+- Threshold (0,05 × 65535): 3277
+
+## Berechnungsformeln
+
+### Td/Tsky Berechnung (aus Lunatico Paper)
+```python
+# Startwerte K-Koeffizienten
+K1 = 30.0
+K2 = 125.0
+K3 = 0.0
+K4 = 0.0
+K5 = 0.0
+K6 = 0.0
+K7 = 0.0
+
+# Eingaben
+Tamb: Außentemperatur von PWS (°C)
+Tobj: IR-Himmelstemperatur von MLX90614 (°C)
+
+# Berechnung T67
+if abs((K2 / 10. - Tamb)) < 1:
+    T67 = sign(K6) * sign(Tamb - K2 / 10.) * abs((K2 / 10. - Tamb))
+else:
+    T67 = K6 / 10. * sign(Tamb - K2 / 10.) * (log(abs((K2 / 10. - Tamb))) / log(10.) + K7 / 100.)
+
+# Hauptformel
+Td = (K1 / 100.) * (Tamb - K2 / 10.) + (K3 / 100.) * pow(exp(K4 / 1000. * Tamb), (K5 / 100.)) + T67
+Tsky = Tobj - Td
+
+# Einheiten
+Tsky, Td, Tamb: °C
+WBG: %
+```
+
+Quelle: https://lunaticoastro.com/aagcw/TechInfo/SkyTemperatureModel.pdf
+
+### Optimierung K1-K7
+- Methode: Least Squares
+- Referenz: WBG aus Bildanalyse (Zielgenauigkeit: ±5-10%)
+- Trainingsdaten: Werden während Betrieb erzeugt
+- Ziel: Tsky soll mit WBG korrelieren
+- Details: Noch auszuarbeiten
+
+## Datenbank-Architektur (ENTSCHIEDEN)
+
+### RRDtool - Zeitreihen-Datenbank
+Zeitauflösungen (Archive):
+- 1 Stunde
+- 1 Tag
+- 1 Woche
+- 1 Monat
+- 1 Jahr
+
+Data Sources (Auswahl):
+- Tamb (°C)
+- Tobj (°C)
+- Td (°C)
+- Tsky (°C)
+- WBG (%)
+- Luftdruck (hPa)
+- Luftfeuchtigkeit (%)
+- Windgeschwindigkeit (km/h)
+- Tropfen/Min
+- Mondphase (0-1)
+- Sonnenauf-/untergang (boolean)
+
+Retention: 2 Jahre
+
+### SQLite - Metadaten & Bildverwaltung
+Tabellen (zu definieren):
+- image_metadata: Timestamp, Pfad, WBG, Threshold, Analyseergebnisse
+- k_coefficients: Timestamp, K1-K7 Werte
+- logs: Fehlermeldungen
+
+### Bild-Archivierung
+- Rohdaten: 5 Min Takt für 7 Tage (~2 GB)
+- Archiv: 1 Bild/Stunde komprimiert für 2 Jahre (~11 GB)
+- Speicherung: Filesystem, nur Pfade in DB
+
+## Astronomische Berechnungen
+
+Standort:
+- Latitude: 51,4798° Nord
+- Longitude: 13,7319° Ost
+- Höhe: 95 m ü.N.N.
+
+Zu berechnen:
+- Mondphase (Präzision: 5%)
+- Mondwinkelabstand zum Zenit
+- Sonnenaufgang/-untergang (für Relevanzfilter)
+- Nur Nachtdaten: Sonnenuntergang bis -aufgang
+
+Einfluss auf:
+- Threshold-Anpassung (Mondhelligkeit)
+- Datenfilterung (nur Nacht)
+
+## Projekt-Prioritäten (VORSCHLAG)
+
+1. ✅ Projektstruktur erstellt (Git, Python, Dependencies)
+2. ⏳ DB-Schema: RRD + SQLite definieren
+3. ⏳ PWS API-Modul: JSON-Abfrage + Fehlerbehandlung
+4. ⏳ JSON-Reader: MLX90614 + RG-11 Sensoren
+5. ⏳ Bildverwaltung: Kopieren, Timestamp, Archivierung
+6. ⏳ Bildanalyse: ROI, Grayscale, Threshold, WBG
+7. ⏳ Astronomie: Mondphase, Sonnenzeiten
+8. ⏳ Td/Tsky-Berechnung: K1-K7 Formel implementieren
+9. ⏳ K-Optimierung: Least Squares gegen WBG
+10. ⏳ Web-Interface (Version 2)
+
+## Offene Fragen / Zu klären
+
+1. RRD Data Sources: Vollständige Liste definieren
+2. SQLite Schema: Tabellenstruktur ausarbeiten
+3. Scheduler: APScheduler für verschiedene Intervalle?
+4. Logging: Format, Rotation, Pfad?
+5. Weather.com API Rate Limits: Tagesgrenze?
+6. Fehlerbehandlung: Retry-Logik bei API-Ausfall?
+7. WBG-Kategorisierung: Nach K-Optimierung definieren
+8. Tests: Unit-Tests für Module?
+
+## Git Repository
+
+- URL: https://github.com/ggtux/Weather-DB_v1
+- Branch: main
+- Letzter Commit: Initial commit (a7d2353)
+
+## Dependencies (requirements.txt)
+
+Kernbibliotheken:
+- requests (API-Calls)
+- opencv-python (Bildverarbeitung)
+- Pillow (Bildoperationen)
+- ephem / astropy (Astronomie)
+- numpy, scipy (Numerik, Optimierung)
+- flask (Web-Interface V2)
+- sqlalchemy (DB-ORM)
+- rrdtool (Zeitreihen)
+
+## Konfiguration (config.yml.example vorhanden)
+
+Beispielstruktur angelegt für:
+- Location (Lat/Lon/Alt)
+- API-Endpoints
+- AllSky-Pfade
+- K-Koeffizienten
+- DB-Einstellungen
+- Web-Interface
+
+## Nächster Schritt (BEREIT ZUM START)
+
+1. RRD-Schema definieren und Testdatenbank anlegen
+   ODER
+2. PWS API-Modul implementieren und testen
+
+Warten auf Entscheidung, mit welchem Modul begonnen werden soll.
+
+## Zusätzliche Notizen
+
+- Keine Benutzer-Authentifizierung
+- Kein Backup erforderlich
+- Einfaches Text-Logging bei Fehlern
+- Kein Monitoring/Alerting
+- Service-Start nach erfolgreichen Tests
+- Version 2: Web-Interface mit Visualisierungen
