@@ -3,6 +3,7 @@ Beschreibung des Projektziels:
     Bildanalyse der Himmelsaufnahme der Allsky Kamera, mit Timestamp, 
     Optimierung der Koeffizienten des Berechnungsalgorithmus für Td (Berechnungsschema siehe unten) in Abhängigkeit von der Außentemperatur Tamb
     Gestaltung eines Webinterfaces zur Analyse und Darstellung der gemessenen und berechneten Daten.
+    Klassifizierung der prozessierten Images nach WBG 0 .. 35%; 36 .. 50% und 51 -100%, weiter Klassifizierung nach Mondphase 0 ..24,25..49,50..100%
 
 
 Haupt-Funktionen:
