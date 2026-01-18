@@ -1,0 +1,40 @@
+Beschreibung des Projektziels:
+    Programmierung einer Datenbank für Wetterdaten aus einer JSON-Abfrage der Privaten Wetterstation (PWS) über API
+    Bildanalyse der Himmelsaufnahme der Allsky Kamera, mit Timestamp, 
+    Optimierung der Koeffizienten des Berechnungsalgorithmus für Td (Berechnungsschema siehe unten) in Abhängigkeit von der Außentemperatur Tamb
+    Gestaltung eines Webinterfaces zur Analyse und Darstellung der gemessenen und berechneten Daten.
+
+
+Haupt-Funktionen:
+    
+    JSON ist das allgemeine Datenaustauschformat, Berechnung und Berücksichtugung der relevanten Tageszeit von Sonnenuntergang bis - aufgang
+    Ermillung der Mondphase und des aktullen Winkelabstandes zum Zenit
+    Einbeziehung der Daten des Regensensor RG-11 von RPi "Allskycam"
+    Erfassung von Wolkentemperaturmessungen Tsky eines speziellen Sensors (JSON-Abfrage) vom RPi "Allskycam"
+    Berechnung der Himmelstemperatur Td , TSky und des Wolkenbedeckungsgrades WBG
+    Einbeziehung von jpg-Images einer Allsky Kamera, welche per scp aller 5 min geliefert werden,  regelmäßige Abfrage der API (1/Stunde)
+    Definition einer ROI (Startwert = 30°) um den Zenit (das ist die feste Ausrichtung der Allsky Kamera "Allskycam"), 
+    16 RGB Bild in S/W-Bild oder Graustufenbild umwandeln (Schwellwert finden für Unterscheidung von Wolken, Sternen, Mond und andere Lichtquellen)
+    Korrelation mit Wetterdaten wie Regen (Tropen pro Minute) vom Regensensor RG-11
+    Die Himmelsdaten sind bezüglich meines Standortes zu berechnen: Latitude: 51,4798° Nord, Longitude: 13,7319 Ost, Höhe ü.N.N. = 95 m
+    
+
+Berechnungsschema in Python: 
+            K1 = 30. //Startwerte für Optimierung
+            K2 = 125.
+            K3 = 0.
+            K4 = 0.
+            K5 = 0.
+            K6 = 0.
+            K7 = 0.
+            Tamb: außentemperatur (von API PWS)
+            Tobj: Wolkentemperatur (Messung des spez. Sensors - JSON Daten)
+            //Berechnungsformel ist von der Tamb abhängig
+            if abs((K2 / 10. - Tamb)) < 1:
+               T67 = sign(K6) * sign(Tamb - K2 / 10.) * abs((K2 / 10. - Tamb))
+            else:
+               T67 = K6 / 10. * sign(Tamb - K2 / 10.) * (log(abs((K2 / 10. - Tamb))) / log(10.) + K7 / 100.)
+            
+            Td = (K1 / 100.) * (Tamb - K2 / 10.) + (K3 / 100.) * pow(exp(K4 / 1000. * Tamb), (K5 / 100.)) + T67
+            Tsky=Tobj-Td
+            Der WBG wird durch Kategorisierung in Abhängigkeit 

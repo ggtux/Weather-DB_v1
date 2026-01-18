@@ -1,0 +1,59 @@
+# Weather-DB v1 Configuration Example
+# Copy this file to config.yml and adjust settings
+
+# Location settings
+location:
+  latitude: 51.4798  # Degrees North
+  longitude: 13.7319  # Degrees East
+  altitude: 95  # Meters above sea level
+
+# API Configuration
+api:
+  pws_endpoint: "https://your-pws-api.example.com/weather"
+  pws_api_key: "your-api-key-here"
+  cloud_sensor_endpoint: "http://allskycam.local/sensor/json"
+  update_interval: 3600  # seconds (1 hour)
+
+# AllSky Camera
+allsky:
+  scp_host: "allskycam.local"
+  scp_user: "pi"
+  scp_path: "/path/to/images"
+  image_interval: 300  # seconds (5 minutes)
+  roi_angle: 30  # degrees from zenith
+
+# RG-11 Rain Sensor
+rain_sensor:
+  endpoint: "http://allskycam.local/rain/json"
+
+# Cloud calculation coefficients (for optimization)
+cloud_calc:
+  K1: 30.0
+  K2: 125.0
+  K3: 0.0
+  K4: 0.0
+  K5: 0.0
+  K6: 0.0
+  K7: 0.0
+
+# Database
+database:
+  type: "sqlite"  # sqlite, postgresql, mysql
+  path: "data/weather.db"  # for SQLite
+  # For PostgreSQL/MySQL:
+  # host: "localhost"
+  # port: 5432
+  # name: "weather_db"
+  # user: "weather_user"
+  # password: "password"
+
+# Web Interface
+web:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "logs/weather-db.log"
