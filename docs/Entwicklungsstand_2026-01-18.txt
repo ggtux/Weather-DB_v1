@@ -164,6 +164,45 @@ Tabellen (zu definieren):
 - k_coefficients: Timestamp, K1-K7 Werte
 - logs: Fehlermeldungen
 
+SQL-Statements für die vorgeschlagenen SQLite-Tabellen image_metadata, k_coefficients und logs:
+```sql
+-- Tabelle für Bild-Metadaten und Analyseergebnisse
+CREATE TABLE IF NOT EXISTS image_metadata (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    image_path TEXT NOT NULL,
+    roi_image_path TEXT,
+    wbg INTEGER, -- Wolkenbedeckungsgrad in %
+    moon_phase REAL, -- 0-100 %
+    moon_zenith_angle REAL, -- Grad
+    threshold INTEGER,
+    analysis_version TEXT,
+    classification INTEGER, -- Klassifizierte WBG-Kategorie (0,10,...,100)
+    comment TEXT
+);
+
+-- Tabelle für Koeffizienten
+CREATE TABLE IF NOT EXISTS k_coefficients (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    k1 REAL,
+    k2 REAL,
+    k3 REAL,
+    k4 REAL,
+    k5 REAL,
+    k6 REAL,
+    k7 REAL
+);
+
+-- Tabelle für Logs
+CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME NOT NULL,
+    level TEXT,
+    message TEXT
+);
+```
+
 ### Bild-Archivierung
 - Rohdaten: 5 Min Takt für 7 Tage (~2 GB)
 - Archiv: 1 Bild/Stunde komprimiert für 2 Jahre (~11 GB)
