@@ -111,3 +111,7 @@ comment = st.text_input("Kommentar", value=meta["comment"] if meta and meta["com
 if st.button("Speichern"):
     save_classification(image_name, round(white_percent,2), comment)
     st.success("Klassifizierung gespeichert!")
+
+# Referenzwert für wolkenfreien Nachthimmel (ohne Mond):
+# Schwellwert = 33 → 0,21% weiße Pixel (entspricht Sternenlicht)
+# Werte darüber deuten auf Wolken oder Mondlicht hin.
