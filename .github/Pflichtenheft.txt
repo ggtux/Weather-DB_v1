@@ -98,12 +98,24 @@ Fehlende Informationen im Pflichtenheft: (Antworten durch -> gekennzeichnet)
     Speicherort der Images? -> ~/Arbeitsplatz/Weatherdata/image/image.jpg
     Verhalten bei fehlenden Bildern? -> übergehen
 4. Wolkentemperatursensor
-    API-Endpoint für JSON-Abfrage -> ~/Arbeitsplatz/Weatherdata/Temp/Td.json
-    Datenstruktur der Sensorwerte -> JSON-Bsp: 'MLX90614': {'init': True, 'T amb': 46.86998749, 'T obj': 32.24999237}, 
-    Abfrageintervall? -> 1/minute
+    API-Endpoint für JSON-Abfrage -> ~/Arbeitsplatz/Weatherdata/Sensordaten/sensor-readings.json
+    Datenstruktur der Sensorwerte -> [
+                                        {
+                                            "timestamp": "2026-01-19T14:21:43.823314",
+                                            "Tobj": -23.329999999999984,
+                                            "rain_vol": 0.0
+                                        },
+        Hinweis: Der jeweils aktuelle Eintrag wird immer am Ende der Datei angefügt. Für die Verarbeitung ist stets der letzte Eintrag im JSON-Array zu verwenden.
+
+    Abfrageintervall? -> 1 Abruf aller 5 min
 5. RG-11 Regensensor
-    Datenabruf-Methode (API, direkte Verbindung)? -> JSON-File in ~/Arbeitsplatz/Weatherdata/RG-11/rain.json, {'RG11 Rain Sensor': {'init': True, 'mode': 'drop detect', 'count': 17385, 'drop freq': 0}
-    Datenformat? -> json
+    API-Endpoint für JSON-Abfrage -> ~/Arbeitsplatz/Weatherdata/Sensordaten/sensor-readings.json
+    Datenstruktur der Sensorwerte -> [
+                                        {
+                                            "timestamp": "2026-01-19T14:21:43.823314",
+                                            "Tobj": -23.329999999999984,
+                                            "rain_vol": 0.0
+                                        },
 6. Web-Interface Anforderungen
     Benutzerauthentifizierung? -> Nein
     Welche Visualisierungen (Diagramme, Karten, Tabellen)? -> vorgesehen für Version 2
