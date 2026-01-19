@@ -11,7 +11,7 @@ ROI_IMAGE_DIR = "../Weatherdata/image/roi/"
 
 # --- Hilfsfunktionen ---
 def get_image_list(image_dir):
-    return [f for f in os.listdir(image_dir) if f.lower().endswith(".jpg") or f.lower().endswith(".png")]
+    return [f for f in os.listdir(image_dir) if f.lower().endswith(".jpg")]
 
 def load_metadata(image_name):
     conn = sqlite3.connect(DB_PATH)
@@ -46,8 +46,7 @@ image_path = os.path.join(ROI_IMAGE_DIR, image_name)
 image = Image.open(image_path).convert("L")
 image_np = np.array(image)
 
-# Helligkeit per Slider einstellbar
-brightness = st.slider("Helligkeit anpassen", min_value=0.1, max_value=3.0, value=1.0, step=0.01)
+brightness = 1.3
 image_np_adj = np.clip(image_np * brightness, 0, 255).astype(np.uint8)
 
 
@@ -60,9 +59,9 @@ center = (width // 2, height // 2)
 roi_radius = 676
 cv2.circle(roi_image, center, roi_radius, (0, 255, 0), 3)
 
-# Schwellwert-Regler für Binarisierung
+# Schwellwert für Binarisierung (Standardwert: 26 für wolkenfreien Himmel)
 st.subheader("Schwellwert für Binarisierung")
-threshold = st.slider("Schwellwert (0=schwarz, 255=weiß)", min_value=0, max_value=255, value=128, step=1)
+threshold = st.slider("Schwellwert (0=schwarz, 255=weiß)", min_value=0, max_value=255, value=26, step=1)
 
 # Binarisiertes Bild erzeugen (und speichern)
 binary_np = np.where(image_np_adj < threshold, 0, 255).astype(np.uint8)
