@@ -86,7 +86,7 @@ white_percent = 100 * white_pixels / total_pixels if total_pixels > 0 else 0
 
 # Bild und WBG-Prozentanzeige nebeneinander (nur binarisiertes Bild)
 col1, col2 = st.columns([3,1])
-col1.image(binary_image, caption=f"ROI (40°) Binarisiertes Bild (Schwellwert: {threshold})", width=col1.width if hasattr(col1, 'width') else None)
+col1.image(binary_image, caption=f"ROI (40°) Binarisiertes Bild (Schwellwert: {threshold})", width='content')
 col2.metric("Wolkenbedeckung (WBG)", f"{white_percent:.2f} %")
 
 # Metadaten laden
