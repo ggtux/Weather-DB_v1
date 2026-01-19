@@ -41,38 +41,24 @@ JSON-Struktur:
 }
 ```
 
-### 2. MLX90614 Wolkentemperatursensor
-- Pfad: ~/Arbeitsplatz/Weatherdata/Temp/Td.json
-- Abfrageintervall: 1x/Minute
-- Liefert: Tobj (IR-Himmelstemperatur), Tamb
 
-JSON-Struktur:
+### 2. MLX90614 Wolkentemperatursensor & 3. RG-11 Regensensor
+- Pfad: ~/Arbeitsplatz/Weatherdata/Sensordaten/sensor-readings.json
+- Abfrageintervall: 1x/5 Minuten
+- Liefert: Tobj (IR-Himmelstemperatur), rain_vol (Regenmenge)
+
+JSON-Struktur (Beispiel, Array von Einträgen):
 ```json
-{
-  "MLX90614": {
-    "init": true,
-    "T amb": 46.86998749,
-    "T obj": 32.24999237
-  }
-}
+[
+  {
+    "timestamp": "2026-01-19T14:21:43.823314",
+    "Tobj": -23.33,
+    "rain_vol": 0.0
+  },
+  ...
+]
 ```
-
-### 3. RG-11 Regensensor
-- Pfad: ~/Arbeitsplatz/Weatherdata/RG-11/rain.json
-- Abfrageintervall: ?
-- Liefert: Tropfenzähler, Modus
-
-JSON-Struktur:
-```json
-{
-  "RG11 Rain Sensor": {
-    "init": true,
-    "mode": "drop detect",
-    "count": 17385,
-    "drop freq": 0
-  }
-}
-```
+Hinweis: Der jeweils aktuelle Eintrag wird immer am Ende der Datei angefügt. Für die Verarbeitung ist stets der letzte Eintrag im JSON-Array zu verwenden.
 
 ### 4. AllSky Kamera Bilder
 - Aktuelles Bild: ~/Arbeitsplatz/Weatherdata/image/image.jpg
