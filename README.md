@@ -65,6 +65,7 @@ cp config.yml.example config.yml
 ```bash
 python src/main.py
 ```
+streamlit run tools/image_classification_tool.py
 
 ### Development Mode
 

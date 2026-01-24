@@ -5,9 +5,9 @@ import numpy as np
 import os
 
 # --- Konfiguration ---
-DB_PATH = "../weather.db"  # Passe ggf. an
-IMAGE_DIR = "../Weatherdata/image/"
-ROI_IMAGE_DIR = "../Weatherdata/image/roi/"
+DB_PATH = "./weather.db"  # Passe ggf. an
+IMAGE_DIR = "./Weatherdata/image/"
+ROI_IMAGE_DIR = "./Weatherdata/image/roi/"
 
 # --- Hilfsfunktionen ---
 def get_image_list(image_dir):
