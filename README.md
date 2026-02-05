@@ -1,3 +1,37 @@
+# Weather-DB FITS-Workflow
+
+## FITS-Tools Übersicht
+
+### 1. fitsdata-collector.py
+Dieses Tool durchsucht das Bild- und Sensordatenverzeichnis, verknüpft Bilddateien mit den passenden Sensordaten (per Timestamp) und erzeugt für jedes Bild eine FITS-Datei mit:
+- Bilddaten (als Graustufen-Array)
+- Sensordaten im FITS-Header
+- Automatisch berechneten Zusatzfeldern im Header:
+    - MONDPHAS: Mondphasen-Kategorie (0–4)
+    - MONDZEN: Mondabstand zum Zenit (deg)
+    - SKYTHRES: Schwellwert Himmelshintergrund (Median, initial)
+    - ROI_MED: Median im 40°-ROI um den Zenit
+    - ROI_MEAN: Mittelwert im 40°-ROI
+    - ROI_STARS: Anzahl Sterne im ROI (Schätzung)
+
+### 2. image_classification_tool.py
+Interaktives Streamlit-Tool zur Sichtung und Nachbearbeitung der FITS-Dateien:
+- Blättern durch FITS-Dateien (Vorwärts/Rückwärts)
+- Anzeige der Bilddaten (Graustufen oder RGB)
+- Anzeige aller wichtigen FITS-Headerdaten tabellarisch
+- Threshold-Regler (Startwert = SKYTHRES aus Header)
+- Threshold kann angepasst und direkt im FITS-Header gespeichert werden
+- Wolkenbedeckung (WBG) wird live berechnet und angezeigt
+
+#### Bedienung
+1. `python fitsdata-collector.py` ausführen, um FITS-Dateien zu erzeugen.
+2. `streamlit run image_classification_tool.py` starten, um die FITS-Dateien zu sichten und zu bearbeiten.
+3. Mit den Buttons und Reglern durch die FITS blättern und Parameter anpassen.
+
+**Hinweis:** Die FITS-Dateien werden numerisch/chronologisch sortiert angezeigt. Änderungen am Threshold werden direkt im FITS-Header gespeichert.
+
+---
+Standortdaten und weitere Details siehe Pflichtenheft und Entwicklungsstand im Ordner `docs/`.
 # Weather-DB v1
 
 Eine Python-basierte Wetterdatenbank zur Integration von:

@@ -1,0 +1,169 @@
+import os
+import json
+from datetime import datetime, timedelta
+from glob import glob
+from astropy.io import fits
+from astropy.time import Time
+from astropy.coordinates import EarthLocation, AltAz, get_body
+import numpy as np
+from PIL import Image
+
+# Konfiguration
+SENSOR_JSON = '/home/geo/Arbeitsplatz/Weatherdata/Sensordaten/sensor-readings.json'
+IMAGE_DIR = '/home/geo/Arbeitsplatz/Weatherdata/image'
+FITS_DIR = '/home/geo/Arbeitsplatz/Weatherdata/fits'
+
+# Hilfsfunktion: Timestamp aus Bilddateiname extrahieren
+def extract_timestamp_from_filename(filename):
+    # Beispiel: 20260203_075601.jpg
+    base = os.path.basename(filename)
+    dt = datetime.strptime(base[:15], '%Y%m%d_%H%M%S')
+    return dt
+
+# Hilfsfunktion: Nächstgelegenen Sensordatensatz zum Bild finden
+def find_matching_sensor_data(image_time, sensor_data, max_diff=timedelta(minutes=5)):
+    best = None
+    best_diff = max_diff
+    for entry in sensor_data:
+        try:
+            t = datetime.fromisoformat(entry['timestamp'])
+        except Exception:
+            continue
+        diff = abs(image_time - t)
+        if diff < best_diff:
+            best = entry
+            best_diff = diff
+    return best
+
+
+# Standortdaten
+LAT = 51.4798
+LON = 13.7319
+HEIGHT = 95
+LOCATION = EarthLocation(lat=LAT, lon=LON, height=HEIGHT)
+
+# Hilfsfunktionen für FITS-Felder
+def calc_moonphase(obs_time):
+    # Näherung: 0=Neumond, 50=Halb, 100=Vollmond
+    # Quelle: https://stackoverflow.com/a/49114508
+    y = obs_time.year
+    m = obs_time.month
+    d = obs_time.day
+    if m < 3:
+        y -= 1
+        m += 12
+    k1 = int(365.25 * (y + 4712))
+    k2 = int(30.6 * (m + 1))
+    k3 = int(((y / 100) + 49) * 0.75) - 38
+    jd = k1 + k2 + d + 59  # Julian day
+    jd -= k3
+    ip = (jd - 2451550.1) / 29.530588853
+    ip -= int(ip)
+    phase = round(ip * 100)
+    # Kategorisierung
+    if phase <= 0:
+        return 0
+    elif phase < 25:
+        return 1
+    elif phase < 50:
+        return 2
+    elif phase < 75:
+        return 3
+    else:
+        return 4
+
+def calc_moon_zenit(obs_time):
+    t = Time(obs_time)
+    altaz = AltAz(obstime=t, location=LOCATION)
+    moon = get_body('moon', t, location=LOCATION)
+    alt = moon.transform_to(altaz).alt.deg
+    return 90 - alt  # Abstand zum Zenit
+
+def calc_sky_threshold(img_arr):
+    # Dummy: Median als Schwellwert (später Otsu oder anderes Verfahren)
+    return float(np.median(img_arr))
+
+def get_roi_mask(shape, center=None, radius_deg=40, fov_deg=180):
+    # Annahme: Fisheye, Bildmitte = Zenit, fov_deg = Bildfeld (z.B. 180°)
+    h, w = shape
+    if center is None:
+        center = (w // 2, h // 2)
+    y, x = np.ogrid[:h, :w]
+    r = np.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2)
+    max_r = min(center[0], center[1])
+    roi_r = max_r * (radius_deg / (fov_deg / 2))
+    mask = r <= roi_r
+    return mask
+
+def calc_roi_stats(img_arr):
+    mask = get_roi_mask(img_arr.shape)
+    roi = img_arr[mask]
+    median = float(np.median(roi))
+    mean = float(np.mean(roi))
+    # Dummy: Anzahl Sterne = Pixel > (Median + 3*Std)
+    threshold = median + 3 * np.std(roi)
+    n_stars = int(np.sum(roi > threshold))
+    return median, mean, n_stars
+
+# FITS-Header-Keys (jetzt ohne Werte)
+FITS_HEADER_KEYS = [
+    ('MONDPHAS', 'Mondphase (0,1,2,3,4)'),
+    ('MONDZEN', 'Mondabstand zum Zenit (deg)'),
+    ('SKYTHRES', 'Schwellwert Himmelshintergrund'),
+    ('ROI_MED', 'Median ROI (40deg um Zenit)'),
+    ('ROI_MEAN', 'Mittelwert ROI (40deg um Zenit)'),
+    ('ROI_STARS', 'Anzahl Sterne ROI'),
+]
+
+# Hauptfunktion
+def main():
+    # Sensordaten laden
+    with open(SENSOR_JSON, 'r') as f:
+        sensor_data = json.load(f)
+    # Alle Bilddateien finden
+    image_files = sorted(glob(os.path.join(IMAGE_DIR, '*.jpg')))
+    for img_path in image_files:
+        img_time = extract_timestamp_from_filename(img_path)
+        sensor = find_matching_sensor_data(img_time, sensor_data)
+        if not sensor:
+            print(f'Kein Sensordatensatz für {img_path}')
+            continue
+        # Bilddaten laden
+        img = Image.open(img_path).convert('L')
+        img_arr = np.array(img)
+        # FITS-Header vorbereiten und Werte berechnen
+        hdr = fits.Header()
+        obs_time = img_time
+        # 1. Mondphase
+        mondphase = calc_moonphase(obs_time)
+        # 2. Mondabstand zum Zenit
+        mondzen = calc_moon_zenit(obs_time)
+        # 3. Schwellwert Himmelshintergrund
+        sky_thresh = calc_sky_threshold(img_arr)
+        # 4-6. ROI-Statistiken
+        roi_median, roi_mean, roi_stars = calc_roi_stats(img_arr)
+        # Header setzen
+        hdr['MONDPHAS'] = (mondphase, 'Mondphase (0,1,2,3,4)')
+        hdr['MONDZEN'] = (mondzen, 'Mondabstand zum Zenit (deg)')
+        hdr['SKYTHRES'] = (sky_thresh, 'Schwellwert Himmelshintergrund')
+        hdr['ROI_MED'] = (roi_median, 'Median ROI (40deg um Zenit)')
+        hdr['ROI_MEAN'] = (roi_mean, 'Mittelwert ROI (40deg um Zenit)')
+        hdr['ROI_STARS'] = (roi_stars, 'Anzahl Sterne ROI')
+        # Sensordaten in Header
+        for k, v in sensor.items():
+            if k == 'timestamp':
+                continue
+            try:
+                hdr[k.upper()[:8]] = v
+            except Exception:
+                pass
+        # FITS-Dateiname
+        fits_name = os.path.splitext(os.path.basename(img_path))[0] + '.fits'
+        fits_path = os.path.join(FITS_DIR, fits_name)
+        # FITS schreiben
+        hdu = fits.PrimaryHDU(img_arr, header=hdr)
+        hdu.writeto(fits_path, overwrite=True)
+        print(f'FITS gespeichert: {fits_path}')
+
+if __name__ == '__main__':
+    main()
