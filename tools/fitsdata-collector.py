@@ -42,6 +42,15 @@ LON = 13.7319
 HEIGHT = 95
 LOCATION = EarthLocation(lat=LAT, lon=LON, height=HEIGHT)
 
+###############################
+# Theoretische Sternanzahl im ROI (Bortle 4)
+# ROI: Kreis mit 40° Durchmesser (20° Radius) um Zenit
+# Bortle 4: ca. 8.500 Sterne bis 6.1 mag am Himmel
+# Fläche ROI: A = pi * r^2 = pi * 20^2 ≈ 1.257 Quadratgrad
+# Sterne pro Quadratgrad: 8.500 / 41.253 ≈ 0.21
+# Erwartete Sterne im ROI: 0.21 * 1.257 ≈ 264
+THEORETICAL_STARS_BORTLE4_ROI = 264
+
 # Hilfsfunktionen für FITS-Felder
 def calc_moonphase(obs_time):
     # Näherung: 0=Neumond, 50=Halb, 100=Vollmond
@@ -60,17 +69,7 @@ def calc_moonphase(obs_time):
     ip = (jd - 2451550.1) / 29.530588853
     ip -= int(ip)
     phase = round(ip * 100)
-    # Kategorisierung
-    if phase <= 0:
-        return 0
-    elif phase < 25:
-        return 1
-    elif phase < 50:
-        return 2
-    elif phase < 75:
-        return 3
-    else:
-        return 4
+    return phase
 
 def calc_moon_zenit(obs_time):
     t = Time(obs_time)
@@ -103,7 +102,7 @@ def calc_roi_stats(img_arr):
     # Dummy: Anzahl Sterne = Pixel > (Median + 3*Std)
     threshold = median + 3 * np.std(roi)
     n_stars = int(np.sum(roi > threshold))
-    return median, mean, n_stars
+    return median, mean, n_stars, roi
 
 # FITS-Header-Keys (jetzt ohne Werte)
 FITS_HEADER_KEYS = [
@@ -134,21 +133,47 @@ def main():
         # FITS-Header vorbereiten und Werte berechnen
         hdr = fits.Header()
         obs_time = img_time
-        # 1. Mondphase
+        # Zeitangabe in hh:mm
+        obs_time_hm = obs_time.strftime('%H:%M')
+        hdr['OBSHM'] = (obs_time_hm, 'Beobachtungszeit (hh:mm)')
+        # 1. Mondphase (nun als Prozentwert)
         mondphase = calc_moonphase(obs_time)
         # 2. Mondabstand zum Zenit
         mondzen = calc_moon_zenit(obs_time)
         # 3. Schwellwert Himmelshintergrund
         sky_thresh = calc_sky_threshold(img_arr)
         # 4-6. ROI-Statistiken
-        roi_median, roi_mean, roi_stars = calc_roi_stats(img_arr)
+        roi_median, roi_mean, roi_stars, roi_pixels = calc_roi_stats(img_arr)
         # Header setzen
-        hdr['MONDPHAS'] = (mondphase, 'Mondphase (0,1,2,3,4)')
+        hdr['MONDPHAS'] = (mondphase, 'Mondphase (%)')
         hdr['MONDZEN'] = (mondzen, 'Mondabstand zum Zenit (deg)')
         hdr['SKYTHRES'] = (sky_thresh, 'Schwellwert Himmelshintergrund')
         hdr['ROI_MED'] = (roi_median, 'Median ROI (40deg um Zenit)')
         hdr['ROI_MEAN'] = (roi_mean, 'Mittelwert ROI (40deg um Zenit)')
         hdr['ROI_STARS'] = (roi_stars, 'Anzahl Sterne ROI')
+
+        # Theoretische Werte nur bei fast wolkenlosem Himmel (WBG < 30%)
+        wbg = None
+        for k, v in sensor.items():
+            if k.lower() in ['wbg', 'wolkendecke', 'cloudcover']:
+                try:
+                    wbg = float(v)
+                except Exception:
+                    pass
+        if wbg is not None and wbg < 30:
+            # Theoretische Werte berechnen
+            n_theo = THEORETICAL_STARS_BORTLE4_ROI
+            n_pix = len(roi_pixels)
+            # Annahme: 264 Sterne mit Wert 255, Rest wie Hintergrund
+            theo_median = float(np.median(np.concatenate([roi_pixels, np.full(n_theo, 255)])))
+            theo_mean = float((np.sum(roi_pixels) + n_theo * 255) / (n_pix + n_theo))
+            hdr['ROI_TMED'] = (theo_median, 'Theor. Median ROI (Bortle4, wolkenlos)')
+            hdr['ROI_TMEA'] = (theo_mean, 'Theor. Mittelwert ROI (Bortle4, wolkenlos)')
+            # Prozentanteil der tatsächlichen zu theoretischen Sternanzahl
+            if n_theo > 0:
+                star_percent = 100.0 * roi_stars / n_theo
+                hdr['ROI_SPC'] = (star_percent, 'Prozent reale/ideale Sterne im ROI')
+
         # Sensordaten in Header
         for k, v in sensor.items():
             if k == 'timestamp':

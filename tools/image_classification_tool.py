@@ -115,11 +115,29 @@ col2.metric("Wolkenbedeckung (WBG)", f"{white_percent:.2f} %")
 
 # FITS-Headerdaten tabellarisch anzeigen
 st.subheader("FITS-Headerdaten")
-fits_table = {k: header.get(k, '') for k in ['MONDPHAS','MONDZEN','SKYTHRES','ROI_MED','ROI_MEAN','ROI_STARS']}
+
+# FITS-Header ab MONDPHAS dynamisch ausgeben, WBG ergänzen
+fits_keys = list(header.keys())
+if 'MONDPHAS' in fits_keys:
+    idx = fits_keys.index('MONDPHAS')
+    # Alle Header ab MONDPHAS
+    fits_keys = fits_keys[idx:]
+else:
+    fits_keys = ['MONDPHAS','MONDZEN','SKYTHRES','ROI_MED','ROI_MEAN','ROI_STARS']
+# WBG ergänzen, falls nicht vorhanden
+if 'WBG' not in fits_keys:
+    fits_keys.append('WBG')
+fits_table = {k: header.get(k, '') for k in fits_keys}
 st.table(fits_table)
 
 
-# Threshold speichern
-if st.button("Threshold in FITS speichern"):
-    save_threshold_to_fits(hdul, threshold)
-    st.success("Threshold im FITS-Header gespeichert!")
+
+# Werte speichern (Threshold, WBG, alle ab MONDPHAS)
+if st.button("Werte in FITS speichern"):
+    # Threshold speichern
+    hdul[0].header['SKYTHRES'] = (float(threshold), 'Schwellwert Himmelshintergrund')
+    # WBG speichern
+    hdul[0].header['WBG'] = (float(white_percent), 'Wolkenbedeckung (%)')
+    # Alle weiteren Werte ab MONDPHAS (falls editierbar, hier nur flush)
+    hdul.flush()
+    st.success("Werte im FITS-Header gespeichert!")
