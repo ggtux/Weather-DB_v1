@@ -111,7 +111,7 @@ FITS_HEADER_KEYS = [
     ('SKYTHRES', 'Schwellwert Himmelshintergrund'),
     ('ROI_MED', 'Median ROI (40deg um Zenit)'),
     ('ROI_MEAN', 'Mittelwert ROI (40deg um Zenit)'),
-    ('ROI_STARS', 'Anzahl Sterne ROI'),
+    ('ROISTAR', 'Anzahl Sterne ROI'),
 ]
 
 # Hauptfunktion
@@ -139,18 +139,20 @@ def main():
         # 1. Mondphase (nun als Prozentwert)
         mondphase = calc_moonphase(obs_time)
         # 2. Mondabstand zum Zenit
-        mondzen = calc_moon_zenit(obs_time)
+        mondzen = round(calc_moon_zenit(obs_time), 1)
         # 3. Schwellwert Himmelshintergrund
-        sky_thresh = calc_sky_threshold(img_arr)
+        sky_thresh = round(calc_sky_threshold(img_arr), 1)
         # 4-6. ROI-Statistiken
         roi_median, roi_mean, roi_stars, roi_pixels = calc_roi_stats(img_arr)
+        roi_median = round(roi_median, 1)
+        roi_mean = round(roi_mean, 1)
         # Header setzen
         hdr['MONDPHAS'] = (mondphase, 'Mondphase (%)')
         hdr['MONDZEN'] = (mondzen, 'Mondabstand zum Zenit (deg)')
         hdr['SKYTHRES'] = (sky_thresh, 'Schwellwert Himmelshintergrund')
         hdr['ROI_MED'] = (roi_median, 'Median ROI (40deg um Zenit)')
         hdr['ROI_MEAN'] = (roi_mean, 'Mittelwert ROI (40deg um Zenit)')
-        hdr['ROI_STARS'] = (roi_stars, 'Anzahl Sterne ROI')
+        hdr['ROISTAR'] = (roi_stars, 'Anzahl Sterne ROI')
 
         # Theoretische Werte nur bei fast wolkenlosem Himmel (WBG < 30%)
         wbg = None
@@ -165,13 +167,13 @@ def main():
             n_theo = THEORETICAL_STARS_BORTLE4_ROI
             n_pix = len(roi_pixels)
             # Annahme: 264 Sterne mit Wert 255, Rest wie Hintergrund
-            theo_median = float(np.median(np.concatenate([roi_pixels, np.full(n_theo, 255)])))
-            theo_mean = float((np.sum(roi_pixels) + n_theo * 255) / (n_pix + n_theo))
+            theo_median = round(float(np.median(np.concatenate([roi_pixels, np.full(n_theo, 255)]))), 1)
+            theo_mean = round(float((np.sum(roi_pixels) + n_theo * 255) / (n_pix + n_theo)), 1)
             hdr['ROI_TMED'] = (theo_median, 'Theor. Median ROI (Bortle4, wolkenlos)')
             hdr['ROI_TMEA'] = (theo_mean, 'Theor. Mittelwert ROI (Bortle4, wolkenlos)')
             # Prozentanteil der tatsächlichen zu theoretischen Sternanzahl
             if n_theo > 0:
-                star_percent = 100.0 * roi_stars / n_theo
+                star_percent = round(100.0 * roi_stars / n_theo, 1)
                 hdr['ROI_SPC'] = (star_percent, 'Prozent reale/ideale Sterne im ROI')
 
         # Sensordaten in Header
@@ -179,6 +181,9 @@ def main():
             if k == 'timestamp':
                 continue
             try:
+                # Runde Werte auf 1 Dezimalstelle (z.B. TOBJ, Temperatur, WBG)
+                if isinstance(v, (int, float)) and k.lower() in ['tobj', 'temp', 'temperatur', 'tempa', 'tempb', 'wbg', 'wolkendecke', 'cloudcover']:
+                    v = round(float(v), 1)
                 hdr[k.upper()[:8]] = v
             except Exception:
                 pass

@@ -131,7 +131,7 @@ if 'MONDPHAS' in fits_keys:
     # Alle Header ab MONDPHAS
     fits_keys = fits_keys[idx:]
 else:
-    fits_keys = ['MONDPHAS','MONDZEN','SKYTHRES','ROI_MED','ROI_MEAN','ROI_STARS']
+    fits_keys = ['MONDPHAS','MONDZEN','SKYTHRES','ROI_MED','ROI_MEAN','ROISTAR']
 # WBG ergänzen, falls nicht vorhanden
 if 'WBG' not in fits_keys:
     fits_keys.append('WBG')
