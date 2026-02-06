@@ -20,14 +20,22 @@ def get_fits_list(fits_dir):
     return sorted(fits_files, key=extract_num)
 
 def load_fits_data(fits_path):
-    with fits.open(fits_path, mode='update') as hdul:
+    with fits.open(fits_path, mode='readonly') as hdul:
         img_data = hdul[0].data
-        header = hdul[0].header
-        return np.array(img_data), header, hdul
+        header = hdul[0].header.copy()
+    return np.array(img_data), header, fits_path
 
-def save_threshold_to_fits(hdul, new_threshold):
-    hdul[0].header['SKYTHRES'] = (float(new_threshold), 'Schwellwert Himmelshintergrund')
-    hdul.flush()
+def save_values_to_fits(fits_path, threshold, wbg):
+    """Speichert Threshold und WBG in den FITS-Header."""
+    try:
+        with fits.open(fits_path, mode='update') as hdul:
+            hdul[0].header['SKYTHRES'] = (float(threshold), 'Schwellwert Himmelshintergrund')
+            hdul[0].header['WBG'] = (float(wbg), 'Wolkenbedeckung (%)')
+            hdul.flush()
+        return True
+    except Exception as e:
+        print(f'Fehler beim Speichern: {e}')
+        return False
 
 # --- Streamlit UI ---
 
@@ -56,7 +64,7 @@ fits_path = os.path.join(FITS_DIR, fits_name)
 
 
 # FITS laden
-img_data, header, hdul = load_fits_data(fits_path)
+img_data, header, fits_path_full = load_fits_data(fits_path)
 
 # Umschaltung RGB/SW
 st.subheader("Bilddarstellung")
@@ -127,17 +135,26 @@ else:
 # WBG ergänzen, falls nicht vorhanden
 if 'WBG' not in fits_keys:
     fits_keys.append('WBG')
-fits_table = {k: header.get(k, '') for k in fits_keys}
+
+# Timestamps wandeln: OWM_SUNR und OWM_SUNS
+fits_table = {}
+for k in fits_keys:
+    val = header.get(k, '')
+    if k in ['OWM_SUNR', 'OWM_SUNS'] and isinstance(val, (int, float, str)):
+        try:
+            ts = int(val)
+            from datetime import datetime
+            val = datetime.fromtimestamp(ts).strftime('%H:%M')
+        except Exception:
+            pass
+    fits_table[k] = val
 st.table(fits_table)
 
 
 
 # Werte speichern (Threshold, WBG, alle ab MONDPHAS)
 if st.button("Werte in FITS speichern"):
-    # Threshold speichern
-    hdul[0].header['SKYTHRES'] = (float(threshold), 'Schwellwert Himmelshintergrund')
-    # WBG speichern
-    hdul[0].header['WBG'] = (float(white_percent), 'Wolkenbedeckung (%)')
-    # Alle weiteren Werte ab MONDPHAS (falls editierbar, hier nur flush)
-    hdul.flush()
-    st.success("Werte im FITS-Header gespeichert!")
+    if save_values_to_fits(fits_path_full, threshold, white_percent):
+        st.success("Werte im FITS-Header gespeichert!")
+    else:
+        st.error("Fehler beim Speichern der Werte!")
