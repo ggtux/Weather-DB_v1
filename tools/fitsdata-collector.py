@@ -17,11 +17,14 @@ FITS_DIR = '/home/geo/Arbeitsplatz/Weatherdata/fits'
 def extract_timestamp_from_filename(filename):
     # Beispiel: 20260203_075601.jpg
     base = os.path.basename(filename)
-    dt = datetime.strptime(base[:15], '%Y%m%d_%H%M%S')
-    return dt
+    try:
+        dt = datetime.strptime(base[:15], '%Y%m%d_%H%M%S')
+        return dt
+    except ValueError:
+        return None
 
 # Hilfsfunktion: Nächstgelegenen Sensordatensatz zum Bild finden
-def find_matching_sensor_data(image_time, sensor_data, max_diff=timedelta(minutes=5)):
+def find_matching_sensor_data(image_time, sensor_data, max_diff=timedelta(minutes=10)):
     best = None
     best_diff = max_diff
     for entry in sensor_data:
@@ -123,6 +126,9 @@ def main():
     image_files = sorted(glob(os.path.join(IMAGE_DIR, '*.jpg')))
     for img_path in image_files:
         img_time = extract_timestamp_from_filename(img_path)
+        if img_time is None:
+            print(f'Überspringe (kein gültiger Timestamp): {os.path.basename(img_path)}')
+            continue
         sensor = find_matching_sensor_data(img_time, sensor_data)
         if not sensor:
             print(f'Kein Sensordatensatz für {img_path}')
