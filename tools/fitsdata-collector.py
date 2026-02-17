@@ -30,6 +30,9 @@ def find_matching_sensor_data(image_time, sensor_data, max_diff=timedelta(minute
     for entry in sensor_data:
         try:
             t = datetime.fromisoformat(entry['timestamp'])
+            # Zeitzone entfernen, falls vorhanden
+            if t.tzinfo is not None:
+                t = t.replace(tzinfo=None)
         except Exception:
             continue
         diff = abs(image_time - t)
