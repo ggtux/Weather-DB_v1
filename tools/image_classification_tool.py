@@ -25,17 +25,34 @@ def load_fits_data(fits_path):
         header = hdul[0].header.copy()
     return np.array(img_data), header, fits_path
 
-def save_values_to_fits(fits_path, threshold, wbg):
-    """Speichert Threshold und WBG in den FITS-Header."""
+def save_values_to_fits_versioned(fits_path, threshold, wbg):
+    """Speichert Threshold und WBG in den FITS-Header und legt eine neue Version im fits-rev-Verzeichnis an."""
+    import re
+    import shutil
+    fits_rev_dir = os.path.expanduser("~/Arbeitsplatz/Weatherdata/fits/fits-rev")
+    os.makedirs(fits_rev_dir, exist_ok=True)
+    base_name = os.path.basename(fits_path)
+    name_no_ext, ext = os.path.splitext(base_name)
+    # Suche nach existierenden Versionen
+    pattern = re.compile(re.escape(name_no_ext) + r"_V(\\d+)" + re.escape(ext))
+    existing_versions = [f for f in os.listdir(fits_rev_dir) if pattern.match(f)]
+    if existing_versions:
+        max_ver = max([int(pattern.match(f).group(1)) for f in existing_versions])
+        next_ver = max_ver + 1
+    else:
+        next_ver = 1
+    new_name = f"{name_no_ext}_V{next_ver}{ext}"
+    new_path = os.path.join(fits_rev_dir, new_name)
     try:
-        with fits.open(fits_path, mode='update') as hdul:
+        # FITS laden, Werte setzen, als neue Datei speichern
+        with fits.open(fits_path, mode='readonly') as hdul:
             hdul[0].header['SKYTHRES'] = (float(threshold), 'Schwellwert Himmelshintergrund')
             hdul[0].header['WBG'] = (float(wbg), 'Wolkenbedeckung (%)')
-            hdul.flush()
-        return True
+            hdul.writeto(new_path, overwrite=True)
+        return True, new_name
     except Exception as e:
         print(f'Fehler beim Speichern: {e}')
-        return False
+        return False, str(e)
 
 # --- Streamlit UI ---
 
@@ -152,9 +169,10 @@ st.table(fits_table)
 
 
 
-# Werte speichern (Threshold, WBG, alle ab MONDPHAS)
-if st.button("Werte in FITS speichern"):
-    if save_values_to_fits(fits_path_full, threshold, white_percent):
-        st.success("Werte im FITS-Header gespeichert!")
+# Werte speichern (Threshold, WBG, alle ab MONDPHAS) als neue Version im fits-rev-Verzeichnis
+if st.button("Werte als neue Version speichern"):
+    success, result = save_values_to_fits_versioned(fits_path_full, threshold, white_percent)
+    if success:
+        st.success(f"Neue FITS-Version gespeichert: {result}")
     else:
-        st.error("Fehler beim Speichern der Werte!")
+        st.error(f"Fehler beim Speichern: {result}")
