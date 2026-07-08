@@ -6,4 +6,4 @@ PROJECT_ROOT="$SCRIPT_DIR/.."
 PYTHON_BIN="python3"
 
 cd "$PROJECT_ROOT"
-$PYTHON_BIN streamlit run tools/image_classification_tool.py "$@"
+streamlit run tools/image_classification_tool.py
