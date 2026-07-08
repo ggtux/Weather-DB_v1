@@ -26,6 +26,12 @@ flask>=3.0.0
 matplotlib>=3.8.0
 plotly>=5.17.0
 
+# Data handling
+pandas>=2.1.0
+
+# Interactive tools (FITS calibration/classification)
+streamlit>=1.53.0
+
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
