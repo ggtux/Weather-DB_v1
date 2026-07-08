@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "created": "2026-02-27T00:00:00",
+    "source": "starter_defaults_from_driver_K_values",
+    "note": "K1..K7 aus compute_cloudcover() des Treibers, a/b lineare Näherung der Exponential-Formel. Bitte durch sky_temp_calibration.py ersetzen.",
+    "rmse": null,
+    "spearman_r": null
+  },
+  "K_global": [
+    50.0,
+    110.0,
+    4.0,
+    100.0,
+    100.0,
+    10.0,
+    100.0
+  ],
+  "a": 1.4305134349793178,
+  "b": 23.194793282355803,
+  "poly_degree": 1,
+  "ta_range": [
+    -20.0,
+    30.0
+  ],
+  "poly_coeffs": null
+}
